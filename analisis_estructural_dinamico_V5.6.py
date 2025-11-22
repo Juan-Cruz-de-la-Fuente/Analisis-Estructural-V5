@@ -21,7 +21,6 @@ import tempfile
 import os
 from scipy.linalg import eig
 
-# Importar openpyxl si está disponible (para Excel)
 try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -697,9 +696,6 @@ def calcular_momento_inercia(tipo_seccion, parametros):
 def calcular_y_asignar_grados_libertad():
     """Calcula los grados de libertad globales y la información de GL para todos los nodos y elementos."""
     st.session_state.grados_libertad_info = []
-    # NO limpiar matrices de elementos aquí, se calculan en el paso 8
-    # st.session_state.matrices_elementos = {} 
-
     # Generar información de GL para cada nodo
     gl_counter = 1
     gl_info_dict = {} # Para mapear GL number a info
@@ -771,8 +767,6 @@ def calcular_y_asignar_grados_libertad():
     # Filtrar solo los GL libres (no nulos) para la lista oficial
     st.session_state.grados_libertad_info = [info for info in all_gl_info if info['numero'] is not None]
     
-# --- Funciones de Resolución de Sistemas ---
-
 def resolver_sistema_dinamico():
     """Resolver el problema de autovalores para análisis dinámico"""
     if not st.session_state.elementos or not st.session_state.grados_libertad_info:
@@ -800,7 +794,7 @@ def resolver_sistema_dinamico():
                         K_global[gl_i-1, gl_j-1] += matriz_k_num[i, j]
                         M_global[gl_i-1, gl_j-1] += matriz_m_num[i, j]
         
-        # Identificar DOF restringidos (desde el paso 9 dinámico)
+        # Identificar DOF restringidos 
         dof_restringidos_idx = [] # base-0
         for gl_num, restringido in st.session_state.condiciones_contorno_dinamica.items():
             if restringido:
@@ -919,9 +913,9 @@ def resolver_sistema():
         
         # Restaurar fuerzas conocidas (reacciones)
         for i, info in enumerate(st.session_state.grados_libertad_info):
-             gl_idx = info['numero'] - 1
-             if not info['desplazamiento_conocido']: # Si el desplazamiento era incógnita
-                 F_calculado[gl_idx] = F[gl_idx] # La fuerza era conocida (aplicada)
+            gl_idx = info['numero'] - 1
+            if not info['desplazamiento_conocido']: # Si el desplazamiento era incógnita
+                F_calculado[gl_idx] = F[gl_idx] # La fuerza era conocida (aplicada)
 
         
         return {
@@ -936,7 +930,6 @@ def resolver_sistema():
         st.error(f"Error resolviendo el sistema estático: {e}")
         return None
 
-# --- Funciones de Modo Interactivo (de V4.7) ---
 
 def crear_grafico_interactivo_moderno():
     """Crear un gráfico interactivo con estilo moderno"""
@@ -1241,10 +1234,10 @@ def crear_tabla_conectividad():
         }
         
         if st.session_state.tipo_elemento in ["viga", "viga_portico"]:
-             data_elem['Inercia [m⁴]'] = f"{elem.get('inercia', 0.0):.6e}"
+            data_elem['Inercia [m⁴]'] = f"{elem.get('inercia', 0.0):.6e}"
         
         if st.session_state.tipo_analisis == "dinamico":
-             data_elem['Densidad [kg/m³]'] = densidad_str
+            data_elem['Densidad [kg/m³]'] = densidad_str
         
         data_elem.update({
             'Longitud [m]': f"{elem.get('longitud', 0.0):.3f}",
@@ -1258,7 +1251,7 @@ def crear_tabla_conectividad():
 
 def crear_tabla_modos_completa():
     """Crear tabla completa con todos los modos y sus amplitudes en todos los DOF,
-       formateada como la imagen de Excel."""
+        formateada como la imagen de Excel."""
     if not st.session_state.resultados_dinamicos:
         return pd.DataFrame()
     
@@ -1345,13 +1338,14 @@ def mostrar_barra_progreso():
     if st.session_state.tipo_analisis == "dinamico":
         pasos_analisis = [
             (9, "Cond. Contorno"),
-            (10, "Resultados") # El Paso 10 ahora es "Resultados"
+            (10, "Resultados") 
         ]
     else: # Estático
         pasos_analisis = [
-            (9, "Incógnitas"),
-            (10, "Resultados") # El Paso 10 ahora es "Resultados"
-        ]
+                (9, "Cond. Contorno"),
+                (10, "Carga Dinámica"),
+                (11, "Resultados")
+            ]
         
     # Combinar todas las listas de pasos
     pasos_tuplas = pasos_base + pasos_modo + pasos_finales_comunes + pasos_analisis
@@ -1468,12 +1462,13 @@ def mostrar_sidebar_mejorado():
         if st.session_state.tipo_analisis == "dinamico":
             pasos_analisis = [
                 (9, "Cond. Contorno"),
-                (10, "Resultados") # El Paso 10 ahora es "Resultados"
+                (10, "Resultados")
             ]
         else: # Estático
             pasos_analisis = [
-                (9, "Incógnitas"),
-                (10, "Resultados") # El Paso 10 ahora es "Resultados"
+                (9, "Cond. Contorno"),
+                (10, "Carga Dinámica"),
+                (11, "Resultados")
             ]
             
         pasos_tuplas = pasos_base + pasos_modo + pasos_finales_comunes + pasos_analisis
@@ -1653,10 +1648,8 @@ def visualizar_estructura_moderna(mostrar_deformada=False, factor_escala=10):
                 x_global_final = x_global_base - v_local_curva * s * factor_escala
                 y_global_final = y_global_base + v_local_curva * c * factor_escala
 
-                # --- CORRECCIÓN LÍMITES ---
                 all_x.extend(x_global_final)
                 all_y.extend(y_global_final)
-                # --- FIN CORRECCIÓN ---
 
                 ax.plot(x_global_final, y_global_final,
                         color='#000000', linewidth=3, alpha=0.9,
@@ -1675,7 +1668,6 @@ def visualizar_estructura_moderna(mostrar_deformada=False, factor_escala=10):
         ax.text(mid_x, mid_y, f'E{elemento["id"]}', ha='center', va='center', fontsize=9, fontweight='600',
                 bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="black", linewidth=1.5, alpha=0.95), zorder=20)
 
-    # --- CORRECCIÓN LÍMITES: Mover cálculo de límites a DESPUÉS de plotear ---
     x_min, x_max = (min(all_x) if all_x else 0), (max(all_x) if all_x else 1)
     y_min, y_max = (min(all_y) if all_y else 0), (max(all_y) if all_y else 1)
     x_range = x_max - x_min if x_max > x_min else 2
@@ -1686,7 +1678,6 @@ def visualizar_estructura_moderna(mostrar_deformada=False, factor_escala=10):
     
     ax.set_xlim(x_min - padding_x, x_max + padding_x)
     ax.set_ylim(y_min - padding_y, y_max + padding_y)
-    # --- FIN CORRECCIÓN LÍMITES ---
     
     # Dibujar nodos
     for i, nodo in enumerate(st.session_state.nodos):
@@ -1746,7 +1737,7 @@ def visualizar_modo_dinamico(modo_idx, factor_escala=None, figsize=(8, 8)):
     Args:
         modo_idx (int): Índice del modo a visualizar (0-based).
         factor_escala (float, optional): Factor para escalar la deformada.
-                                         Si es None, se escala automáticamente.
+                                        Si es None, se escala automáticamente.
         figsize (tuple, optional): Tamaño de la figura (ancho, alto) en pulgadas.
     Returns:
         matplotlib.figure.Figure: La figura de matplotlib con la visualización.
@@ -1821,7 +1812,7 @@ def visualizar_modo_dinamico(modo_idx, factor_escala=None, figsize=(8, 8)):
             despl = desplazamientos_modales_actuales_full[gl_num - 1] 
             
             if gl_num in dof_libres_nums:
-                 max_desplazamiento_nodal = max(max_desplazamiento_nodal, abs(despl))
+                max_desplazamiento_nodal = max(max_desplazamiento_nodal, abs(despl))
 
     # Calcular factor de escala automático si no se proporcionó
     if factor_escala is None:
@@ -1924,17 +1915,15 @@ def visualizar_modo_dinamico(modo_idx, factor_escala=None, figsize=(8, 8)):
                 x_hermite_glob += u_hermite_loc_scaled * np.cos(beta_hermite)
                 y_hermite_glob += u_hermite_loc_scaled * np.sin(beta_hermite)
 
-            # --- CORRECCIÓN LÍMITES ---
             all_x.extend(x_hermite_glob)
             all_y.extend(y_hermite_glob)
-            # --- FIN CORRECCIÓN ---
 
             ax.plot(x_hermite_glob, y_hermite_glob, **line_styles['deformada'])
 
         else: # Barra: solo dibujar línea recta deformada
             ax.plot([x1_def, x2_def], [y1_def, y2_def], **line_styles['deformada'])
 
-    # --- CORRECCIÓN LÍMITES: Mover cálculo de límites a DESPUÉS de plotear ---
+    # ---  Mover cálculo de límites a DESPUÉS de plotear ---
     x_min, x_max = (min(all_x) if all_x else 0), (max(all_x) if all_x else 1)
     y_min, y_max = (min(all_y) if all_y else 0), (max(all_y) if all_y else 1)
     x_range = x_max - x_min if x_max > x_min else 2
@@ -1945,7 +1934,6 @@ def visualizar_modo_dinamico(modo_idx, factor_escala=None, figsize=(8, 8)):
     
     ax.set_xlim(x_min - padding_x, x_max + padding_x)
     ax.set_ylim(y_min - padding_y, y_max + padding_y)
-    # --- FIN CORRECCIÓN LÍMITES ---
 
     # Dibujar nodos originales y deformados (con texto)
     for nodo in st.session_state.nodos:
@@ -1985,10 +1973,99 @@ def visualizar_modo_dinamico(modo_idx, factor_escala=None, figsize=(8, 8)):
     
     return fig
 
-# --- Funciones de Reporte (PDF) ---
+def calcular_barrido_frecuencia(resultados_modales, carga_info, f_min, f_max, num_puntos, gdl_restringidos_base_idx):
+    """
+    Calcula la respuesta (Desplazamiento y Aceleración) para un rango de frecuencias.
+    MEJORADO: Inserta puntos alrededor de las frecuencias naturales para capturar los picos.
+    """
+    try:
+        K_libre = resultados_modales['K_libre']
+        M_libre = resultados_modales['M_libre']
+        
+        # Matrices globales completas para calcular fuerzas de acoplamiento
+        K_global = resultados_modales['K_global']
+        M_global = resultados_modales['M_global']
+        
+        dof_libres_idx = [gl - 1 for gl in resultados_modales['dof_libres']] # base-0
+        dof_restringidos_idx = [gl - 1 for gl in resultados_modales['dof_restringidos']] # base-0
+        
+        # Submatrices de acoplamiento (K_lib_restr y M_lib_restr)
+        K_xy = K_global[np.ix_(dof_libres_idx, dof_restringidos_idx)]
+        M_xy = M_global[np.ix_(dof_libres_idx, dof_restringidos_idx)]
+        
+        # 1. Generar puntos base lineales
+        freqs_base = np.linspace(f_min, f_max, num_puntos)
+        
+        # 2. Obtener frecuencias naturales calculadas previamente
+        f_naturales = resultados_modales['frecuencias_hz']
+        
+        # 3. Crear puntos finos alrededor de las resonancias (±0.5% y ±0.1%)
+        freqs_resonancia = []
+        for fn in f_naturales:
+            if f_min <= fn <= f_max:
+                offsets = [0.95, 0.98, 0.99, 0.995, 0.999, 
+                            1.001, 1.005, 1.01, 1.02, 1.05]
+                
+                for factor in offsets:
+                    freqs_resonancia.append(fn * factor)
+        
+        # 4. Combinar, ordenar y eliminar duplicados
+        freqs = np.unique(np.concatenate((freqs_base, np.array(freqs_resonancia))))
+        freqs = freqs[(freqs >= f_min) & (freqs <= f_max)]
+        # ---------------------------
+
+        omegas = freqs * 2 * np.pi
+        
+        A_base = carga_info['amplitud_A'] # Aceleración constante del shaker
+        
+        # Almacenamiento de resultados
+        resp_despl = np.zeros((len(freqs), len(dof_libres_idx)))
+        resp_acel = np.zeros((len(freqs), len(dof_libres_idx)))
+        
+        # Mapa de GL restringidos
+        mapa_restringidos = {gl_global: i for i, gl_global in enumerate(resultados_modales['dof_restringidos'])}
+        
+        vec_direccion = np.zeros(len(dof_restringidos_idx))
+        for gl_shaker in gdl_restringidos_base_idx:
+            if gl_shaker in mapa_restringidos:
+                vec_direccion[mapa_restringidos[gl_shaker]] = 1.0
+        
+        for i, w in enumerate(omegas):
+            if w == 0: continue
+            
+            # A = w^2 * U => U_base = -A / w^2
+            U_base_amp = -A_base / (w**2)
+            U_y_vec = vec_direccion * U_base_amp
+            
+            # P_eff = (w^2 * M_xy - K_xy) * U_y
+            P_eff = ( (w**2 * M_xy) - K_xy ) @ U_y_vec
+            
+            # Impedancia Z = K - w^2 * M
+            Z = K_libre - (w**2 * M_libre)
+            
+            try:
+                U_x = np.linalg.solve(Z, P_eff)
+                
+                resp_despl[i, :] = np.abs(U_x)
+                resp_acel[i, :] = np.abs(U_x * w**2)
+                
+            except np.linalg.LinAlgError:
+                # Si estamos demasiado cerca de la singularidad
+                resp_despl[i, :] = np.nan 
+                resp_acel[i, :] = np.nan
+
+        return {
+            'freqs': freqs,
+            'desplazamientos': resp_despl,
+            'aceleraciones': resp_acel,
+            'dof_libres': resultados_modales['dof_libres']
+        }
+    except Exception as e:
+        st.error(f"Error en barrido de frecuencia: {e}")
+        return None
 
 def generar_pdf_reporte_dinamico():
-    """Generar reporte PDF para análisis dinámico con estilo Excel y todos los gráficos de modos."""
+    """Generar reporte PDF para análisis dinámico con estilo Excel y corrección de color en matrices locales."""
     if not st.session_state.resultados_dinamicos:
         return None
     
@@ -2001,11 +2078,10 @@ def generar_pdf_reporte_dinamico():
         story = []
         styles = getSampleStyleSheet()
         
-        # --- Estilos (Todos Azules) ---
+        # --- Estilos ---
         title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#2d3748'), spaceAfter=30, alignment=1)
         section_style = ParagraphStyle('CustomSection', parent=styles['Heading2'], fontSize=14, textColor=colors.HexColor('#4472C4'), spaceAfter=12, spaceBefore=12)
         
-        # Esquema de color Azul (para TODAS las tablas)
         style_header_color = colors.HexColor('#4472C4')
         style_data_color = colors.HexColor('#D9E1F2')
         style_header_font_color = colors.whitesmoke
@@ -2017,7 +2093,7 @@ def generar_pdf_reporte_dinamico():
         
         resultado = st.session_state.resultados_dinamicos
         
-        # --- 1. TABLA COMPLETA DE MODOS (Principal) ---
+        # --- 1. TABLA COMPLETA DE MODOS ---
         story.append(Paragraph("1. FORMAS MODALES (EIGENVECTORES)", section_style))
         df_modos = crear_tabla_modos_completa()
         data_modos_full = [list(df_modos.columns)] + df_modos.values.tolist()
@@ -2027,15 +2103,14 @@ def generar_pdf_reporte_dinamico():
              col_widths = [1.0*inch] + [ (doc.width - 1.0*inch) / (len(df_modos.columns)-1) ] * (len(df_modos.columns)-1)
 
         table_modos_full = Table(data_modos_full, colWidths=col_widths)
-        # --- CORRECCIÓN DE COLOR ---
         table_modos_full.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), style_header_color), # Encabezado (Modo)
-            ('BACKGROUND', (0, 1), (-1, 2), style_header_color), # Encabezado (w2, f)
-            ('BACKGROUND', (0, 3), (-1, -1), style_data_color), # Datos
-            ('BACKGROUND', (0, 0), (0, -1), style_data_color), # Columna Parámetro
-            ('TEXTCOLOR', (0, 0), (-1, 2), style_header_font_color), # Texto encabezado
-            ('TEXTCOLOR', (0, 3), (-1, -1), style_data_font_color), # Texto datos
-            ('TEXTCOLOR', (0, 0), (0, -1), style_data_font_color), # Texto params
+            ('BACKGROUND', (0, 0), (-1, 0), style_header_color),
+            ('BACKGROUND', (0, 1), (-1, 2), style_header_color),
+            ('BACKGROUND', (0, 3), (-1, -1), style_data_color),
+            ('BACKGROUND', (0, 0), (0, -1), style_data_color),
+            ('TEXTCOLOR', (0, 0), (-1, 2), style_header_font_color),
+            ('TEXTCOLOR', (0, 3), (-1, -1), style_data_font_color),
+            ('TEXTCOLOR', (0, 0), (0, -1), style_data_font_color),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 6),
@@ -2043,19 +2118,16 @@ def generar_pdf_reporte_dinamico():
             ('BOX', (0, 0), (-1, -1), 1, colors.black)
         ]))
         story.append(table_modos_full)
-        story.append(PageBreak())
-
-        # --- 2. GRÁFICOS DE TODOS LOS MODOS (Uno por página) ---
-        story.append(Paragraph("2. VISUALIZACIÓN DE MODOS", section_style))
-        num_modos = len(resultado['frecuencias_hz'])
         
-        factor_escala_reporte = None # Usar automático
+        # --- 2. GRÁFICOS DE TODOS LOS MODOS ---
+        story.append(PageBreak()) 
+        story.append(Paragraph("2. VISUALIZACIÓN DE MODOS", section_style))
+        
+        num_modos = len(resultado['frecuencias_hz'])
+        factor_escala_reporte = None 
         
         for i in range(num_modos):
-            # --- CORRECCIÓN DE ORDEN: PageBreak ANTES del título y gráfico ---
-            story.append(PageBreak()) 
-            
-            fig_modo = visualizar_modo_dinamico(i, factor_escala_reporte, figsize=(8,8)) # Forzar 8x8
+            fig_modo = visualizar_modo_dinamico(i, factor_escala_reporte, figsize=(8,8))
             
             if fig_modo:
                 img_buffer = io.BytesIO()
@@ -2063,19 +2135,20 @@ def generar_pdf_reporte_dinamico():
                 img_buffer.seek(0)
                 
                 img_pdf = Image(img_buffer)
-                img_pdf.drawHeight = 7 * inch 
-                img_pdf.drawWidth = 7 * inch
+                img_pdf.drawHeight = 6.5 * inch 
+                img_pdf.drawWidth = 6.5 * inch
                 img_pdf.hAlign = 'CENTER'
                 
-                # Título y gráfico JUNTOS
+                story.append(PageBreak())
+                
                 story.append(Paragraph(f"Modo {i+1} (f = {resultado['frecuencias_hz'][i]:.2f} Hz)", styles['Heading3']))
+                story.append(Spacer(1, 10))
                 story.append(img_pdf)
                 
                 plt.close(fig_modo)
 
+        # --- 3. TABLAS DE NODOS Y CONECTIVIDAD ---
         story.append(PageBreak())
-
-        # --- 3. TABLAS DE NODOS Y CONECTIVIDAD (Una por página) ---
         story.append(Paragraph("3. INFORMACIÓN DE NODOS Y ELEMENTOS", section_style))
         
         df_nodos = crear_tabla_nodos()
@@ -2094,9 +2167,8 @@ def generar_pdf_reporte_dinamico():
             ]))
             story.append(Paragraph("Tabla de Nodos", styles['Heading3']))
             story.append(table_nodos)
-            story.append(PageBreak()) 
+            story.append(PageBreak())
         
-        # --- CORRECCIÓN: TABLA DE CONECTIVIDAD REINSERTADA ---
         df_conectividad = crear_tabla_conectividad()
         if not df_conectividad.empty:
             data_conectividad = [list(df_conectividad.columns)] + df_conectividad.values.tolist()
@@ -2118,16 +2190,13 @@ def generar_pdf_reporte_dinamico():
             story.append(Paragraph("Tabla de Conectividad", styles['Heading3']))
             story.append(table_conectividad)
             story.append(PageBreak())
-        # --- FIN CORRECCIÓN ---
 
-        # --- 4. MATRICES GLOBALES Y LOCALES (Una por página) ---
+        # --- 4. MATRICES ---
         story.append(Paragraph("4. MATRICES DEL SISTEMA", section_style))
         
         def create_matrix_table(matrix, title):
-            # Asegurarse de que los GLs coincidan con la info (12 GLs en el ejemplo)
             gl_labels = [f"GL{info['numero']}" for info in st.session_state.grados_libertad_info]
             header = [''] + gl_labels
-            
             data = [header]
             for i, row in enumerate(matrix):
                 formatted_row = [gl_labels[i]] + [f'{val:.3e}' for val in row]
@@ -2135,15 +2204,15 @@ def generar_pdf_reporte_dinamico():
             
             num_cols = len(header)
             col_width = (doc.width*0.95) / num_cols
-            if col_width < 0.3*inch: col_width = 0.3*inch # Mínimo
+            if col_width < 0.3*inch: col_width = 0.3*inch
             
             t = Table(data, colWidths=[col_width]*num_cols)
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), style_header_color),
                 ('BACKGROUND', (0, 1), (0, -1), style_data_color),
                 ('TEXTCOLOR', (0, 0), (-1, 0), style_header_font_color),
-                ('TEXTCOLOR', (0, 1), (-1, 0), style_header_font_color), # Color de GLs en 1ra col
-                ('TEXTCOLOR', (1, 1), (-1, -1), style_data_font_color), # Color de datos
+                ('TEXTCOLOR', (0, 1), (-1, 0), style_header_font_color),
+                ('TEXTCOLOR', (1, 1), (-1, -1), style_data_font_color),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 0), (-1, -1), 5),
@@ -2157,8 +2226,9 @@ def generar_pdf_reporte_dinamico():
         story.extend(create_matrix_table(resultado['M_global'], "Matriz de Masa Global (M)"))
         story.append(PageBreak()) 
 
+        # Matrices Locales
         story.append(Paragraph("Matrices Locales por Elemento", styles['Heading3']))
-
+        
         if st.session_state.tipo_elemento == "viga_portico":
             labels = ["u1", "v1", "θ1", "u2", "v2", "θ2"]
         elif st.session_state.tipo_elemento == "viga":
@@ -2177,12 +2247,17 @@ def generar_pdf_reporte_dinamico():
             
             t_k = Table(data_k, colWidths=[col_width_local]*(len(labels)+1))
             t_m = Table(data_m, colWidths=[col_width_local]*(len(labels)+1))
+            
+            # --- ESTILO CORREGIDO: LETRA NEGRA EN PRIMERA COLUMNA ---
             style = TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), style_header_color),
-                ('BACKGROUND', (0, 1), (0, -1), style_data_color),
-                ('TEXTCOLOR', (0, 0), (-1, 0), style_header_font_color),
-                ('TEXTCOLOR', (0, 1), (0, -1), style_header_font_color), # 1ra col
-                ('TEXTCOLOR', (1, 1), (-1, -1), style_data_font_color), # Datos
+                ('BACKGROUND', (0, 0), (-1, 0), style_header_color), # Encabezado superior
+                ('BACKGROUND', (0, 1), (0, -1), style_data_color),   # Fondo 1ra columna (claro)
+                ('TEXTCOLOR', (0, 0), (-1, 0), style_header_font_color), # Texto Encabezado (blanco)
+                
+                # CORRECCIÓN AQUÍ: Texto de 1ra columna en NEGRO
+                ('TEXTCOLOR', (0, 1), (0, -1), colors.black), 
+                
+                ('TEXTCOLOR', (1, 1), (-1, -1), style_data_font_color), # Resto de datos (negro)
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTSIZE', (0, 0), (-1, -1), 8), 
                 ('INNERGRID', (0,0), (-1,-1), 0.25, colors.black), 
@@ -2194,12 +2269,45 @@ def generar_pdf_reporte_dinamico():
             story.append(PageBreak()) 
             story.append(Paragraph(f"Elemento {elem_id} - Matriz de Rigidez Local (k')", styles['Heading3']))
             story.append(t_k)
-            story.append(PageBreak()) 
-            
+            story.append(Spacer(1, 15))
             story.append(Paragraph(f"Elemento {elem_id} - Matriz de Masa Local (m')", styles['Heading3']))
             story.append(t_m)
 
-        # Construir PDF
+        # --- 5. NUEVOS GRÁFICOS (TIEMPO Y FRECUENCIA) ---
+        if 'fig_time_last' in st.session_state or 'fig_acc_last' in st.session_state:
+            story.append(PageBreak())
+            story.append(Paragraph("5. ANÁLISIS DE RESPUESTA DINÁMICA", section_style))
+
+            # Gráfico Temporal
+            if 'fig_time_last' in st.session_state:
+                img_buffer = io.BytesIO()
+                st.session_state['fig_time_last'].savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+                img_buffer.seek(0)
+                img = Image(img_buffer, width=7*inch, height=4.5*inch)
+                story.append(Paragraph("Respuesta Temporal (Transitorio + Estacionario)", styles['Heading3']))
+                story.append(img)
+                story.append(Spacer(1, 20))
+
+            # Gráficos de Frecuencia (Barrido)
+            if 'fig_acc_last' in st.session_state:
+                story.append(PageBreak())
+                img_buffer_acc = io.BytesIO()
+                st.session_state['fig_acc_last'].savefig(img_buffer_acc, format='png', dpi=150, bbox_inches='tight')
+                img_buffer_acc.seek(0)
+                img_acc = Image(img_buffer_acc, width=7*inch, height=4.5*inch)
+                story.append(Paragraph("Respuesta en Frecuencia: Aceleración vs Frecuencia", styles['Heading3']))
+                story.append(img_acc)
+                story.append(Spacer(1, 20))
+
+            if 'fig_disp_last' in st.session_state:
+                story.append(PageBreak())
+                img_buffer_disp = io.BytesIO()
+                st.session_state['fig_disp_last'].savefig(img_buffer_disp, format='png', dpi=150, bbox_inches='tight')
+                img_buffer_disp.seek(0)
+                img_disp = Image(img_buffer_disp, width=7*inch, height=4.5*inch)
+                story.append(Paragraph("Respuesta en Frecuencia: Desplazamiento vs Frecuencia", styles['Heading3']))
+                story.append(img_disp)
+
         doc.build(story)
         pdf_buffer.seek(0)
         return pdf_buffer
@@ -2451,7 +2559,7 @@ def generar_excel_reporte_dinamico():
                     except ValueError:
                         pass
         for row in ws_modos[f'B3:B3']: # Fila Freq
-             for cell in row:
+            for cell in row:
                 try:
                     cell.value = float(cell.value)
                     cell.number_format = '0.0'
@@ -2739,6 +2847,86 @@ def generar_excel_reporte_estatico():
         st.error(f"Error generando Excel: {str(e)}")
         return None
 
+def calcular_respuesta_armonica_base(resultados_modales, carga_info):
+    """
+    Calcula la respuesta armónica en estado estacionario de los GDL libres
+    debido a un movimiento de base (shaker).
+    
+    Resuelve: [K_xx - w^2 * M_xx] * {U_x_amp} = (w^2 * [M_xy] - [K_xy]) * {U_y_amp}
+    """
+    try:
+        # 1. Obtener datos del análisis modal
+        K_global = resultados_modales['K_global']
+        M_global = resultados_modales['M_global']
+        
+        # Índices base-0
+        dof_libres_idx = [gl - 1 for gl in resultados_modales['dof_libres']]
+        dof_restringidos_idx = [gl - 1 for gl in resultados_modales['dof_restringidos']]
+        
+        # 2. Obtener datos de la carga
+        A = carga_info['amplitud_A']
+        omega = carga_info['freq_omega']
+        gdl_aplicados_nums = carga_info['gdl_aplicados_nums'] # Números base-1
+        
+        if omega < 1e-6:
+            st.error("La frecuencia $\omega$ no puede ser cero.")
+            return None
+
+        # 3. Particionar las matrices
+        K_xx = K_global[np.ix_(dof_libres_idx, dof_libres_idx)]
+        M_xx = M_global[np.ix_(dof_libres_idx, dof_libres_idx)]
+        K_xy = K_global[np.ix_(dof_libres_idx, dof_restringidos_idx)]
+        M_xy = M_global[np.ix_(dof_libres_idx, dof_restringidos_idx)]
+        
+        # 4. Construir vector de amplitud de desplazamiento de la base {U_y_amp}
+        # $\ddot{U}_y = A \sin(\omega t)$
+        # $U_y = - (A / \omega^2) \sin(\omega t)$
+        # Amplitud de desplazamiento de la base:
+        U_y_amp_escalar = - (A / (omega**2))
+        
+        num_gdl_restringidos = len(dof_restringidos_idx)
+        U_y_amp_vector = np.zeros(num_gdl_restringidos)
+        
+        # Mapear GDL aplicados (base-1) a índices del vector de base (base-0)
+        mapa_gdl_restringidos_a_idx = {gl_num: i for i, gl_num in enumerate(resultados_modales['dof_restringidos'])}
+        
+        for gl_num in gdl_aplicados_nums:
+            if gl_num in mapa_gdl_restringidos_a_idx:
+                idx = mapa_gdl_restringidos_a_idx[gl_num]
+                U_y_amp_vector[idx] = U_y_amp_escalar
+            
+        # 5. Calcular Amplitud del Vector de Carga Equivalente {P_0}
+        # {P_x}(t) = (w^2 [M_xy] - [K_xy]) * {U_y_amp_vector} * sin(wt)
+        # {P_0} = (w^2 [M_xy] - [K_xy]) * {U_y_amp_vector}
+        
+        P_0_vector = ( (omega**2 * M_xy) - K_xy ) @ U_y_amp_vector
+        
+        # 6. Calcular Matriz de Rigidez Dinámica [Z]
+        # [Z] = [K_xx] - w^2 * [M_xx]
+        Z_dinamica = K_xx - (omega**2 * M_xx)
+        
+        # 7. Resolver para Amplitud de Desplazamientos Libres {U_x_amp}
+        # [Z] * {U_x_amp} = {P_0}
+        try:
+            U_x_amp_vector = np.linalg.solve(Z_dinamica, P_0_vector)
+        except np.linalg.LinAlgError:
+            st.error(f"Error: Matriz de rigidez dinámica singular. La frecuencia de excitación ({omega:.2f} rad/s) puede coincidir con una frecuencia natural.")
+            return None
+            
+        return {
+            'exito': True,
+            'P_0_vector': P_0_vector, # Amplitud de P_x
+            'U_x_amp_vector': U_x_amp_vector, # Amplitud de U_x
+            'U_y_amp_vector': U_y_amp_vector, # Amplitud de U_y
+            'dof_libres_nums': resultados_modales['dof_libres'],
+            'dof_restringidos_nums': resultados_modales['dof_restringidos']
+        }
+        
+    except Exception as e:
+        st.error(f"Error calculando la respuesta armónica: {e}")
+        return None
+
+
 # -----------------------------------------------------------------
 # 5. INICIALIZACIÓN DE SESSION STATE
 # -----------------------------------------------------------------
@@ -2787,8 +2975,12 @@ if 'modo_visualizacion' not in st.session_state:
     st.session_state.modo_visualizacion = 1
 if 'resultados_dinamicos' not in st.session_state:
     st.session_state.resultados_dinamicos = None
-if 'grupos_elementos' not in st.session_state: # (Añadido de V4.7)
+if 'grupos_elementos' not in st.session_state:
     st.session_state.grupos_elementos = {}
+if 'carga_dinamica_info' not in st.session_state:
+    st.session_state.carga_dinamica_info = {}
+if 'resultados_forzados' not in st.session_state:
+    st.session_state.resultados_forzados = None
 
 
 # -----------------------------------------------------------------
@@ -3137,8 +3329,33 @@ elif st.session_state.step == 4 and st.session_state.modo == "interactivo":
 elif st.session_state.step == 8:
     st.markdown("## Definición de Elementos")
     st.markdown(f"Configure las propiedades de cada elemento tipo **{st.session_state.tipo_elemento.replace('_', ' ').title()}**.")
+    # --- NUEVA SECCIÓN: Crear Material / Elemento Tipo ---
+    with st.expander("➕ Crear Nuevo Material / Tipo de Elemento", expanded=False):
+        st.info("Defina un nuevo material o tipo de elemento aquí. Una vez guardado, aparecerá en la lista de materiales para asignar a grupos o elementos individuales.")
+        
+        col_new1, col_new2, col_new3 = st.columns(3)
+        with col_new1:
+            nuevo_nombre = st.text_input("Nombre (Ej: Hormigón H30, Perfil IPN):", key="new_mat_name")
+        with col_new2:
+            nuevo_E = st.number_input("Módulo de Young (E) [Pa]:", value=2.1e11, format="%.2e", key="new_mat_E")
+        with col_new3:
+            # Densidad por defecto (acero)
+            nuevo_rho = st.number_input("Densidad [kg/m³]:", value=7850.0, format="%.2f", key="new_mat_rho")
+            
+        if st.button("💾 Guardar Nuevo Material"):
+            if nuevo_nombre:
+                # Guardar en el diccionario de materiales personalizados
+                st.session_state.materiales_personalizados[nuevo_nombre] = {
+                    "modulo_young": nuevo_E,
+                    "densidad": nuevo_rho,
+                    "descripcion": "Material definido por el usuario"
+                }
+                st.success(f"Material '{nuevo_nombre}' creado exitosamente. Ahora puede seleccionarlo en los grupos.")
+                st.rerun() # Recargar para que aparezca en los selectbox
+            else:
+                st.error("Por favor, ingrese un nombre para el material.")
     
-    # (Lógica de V4.7 para Agrupación de Elementos)
+    st.divider()
     with st.expander("👥 Agrupación de Elementos", expanded=False):
         st.markdown("Agrupe elementos con propiedades similares para configuración masiva")
         
@@ -3182,13 +3399,18 @@ elif st.session_state.step == 8:
                     
                     todos_materiales = {**MATERIALES_AEROESPACIALES, **st.session_state.materiales_personalizados}
                     nombres_materiales = list(todos_materiales.keys())
-                    material_grupo = st.selectbox("Material del grupo:", nombres_materiales, key=f"mat_grupo_{nombre_grupo}")
+                    material_grupo = st.selectbox("Material base del grupo:", nombres_materiales, key=f"mat_grupo_{nombre_grupo}")
                     
+                    #  Input para Módulo de Young personalizado ---
+                    valor_defecto_E = todos_materiales[material_grupo]['modulo_young']
+                    modulo_young_grupo = st.number_input(f"Módulo de Young (Pa) para grupo:", 
+                                                        value=float(valor_defecto_E), 
+                                                        format="%.2e", 
+                                                        key=f"E_grupo_{nombre_grupo}")
                     tipo_seccion_grupo = st.radio("Tipo de sección:", 
                                                 ["circular_solida", "circular_hueca", "rectangular", "cuadrada"], 
                                                 format_func=lambda x: x.replace('_', ' ').title(), 
                                                 key=f"seccion_grupo_{nombre_grupo}")
-                    
                     parametros_grupo = {}
                     if tipo_seccion_grupo == "circular_solida":
                         radio_grupo = st.number_input("Radio (m):", value=0.01, min_value=0.001, format="%.4f", key=f"radio_grupo_{nombre_grupo}")
@@ -3208,18 +3430,19 @@ elif st.session_state.step == 8:
                         parametros_grupo['lado'] = lado_grupo
                     
                     # Densidad para análisis dinámico
+                    densidad_grupo = 0.0
                     if st.session_state.tipo_analisis == "dinamico":
                         default_densidad = todos_materiales[material_grupo].get('densidad', 2700)
                         densidad_grupo = st.number_input("Densidad (kg/m³):", value=float(default_densidad), min_value=0.0, format="%.2f", key=f"densidad_grupo_{nombre_grupo}")
                     
                     if st.button(f"💾 Aplicar a Grupo '{nombre_grupo}'", key=f"aplicar_grupo_{nombre_grupo}"):
                         elementos_grupo_ids = info_grupo['elementos']
-                        props_material = todos_materiales[material_grupo]
+                        # No usamos props_material['modulo_young'] directamente, usamos el input
                         
                         for elemento_id in elementos_grupo_ids:
                             elemento_idx = next((i for i, e in enumerate(st.session_state.elementos) if e['id'] == elemento_id), None)
                             if elemento_idx is None:
-                                continue # Saltar si el elemento no existe
+                                continue 
 
                             # Actualizar propiedades del elemento
                             elem = st.session_state.elementos[elemento_idx]
@@ -3235,6 +3458,9 @@ elif st.session_state.step == 8:
                             
                             if st.session_state.tipo_analisis == "dinamico":
                                 elem['densidad'] = densidad_grupo
+                            else:
+                                # Si es estático, actualizamos densidad por consistencia aunque no se use en K
+                                elem['densidad'] = todos_materiales[material_grupo].get('densidad', 2700)
                             
                             # Recalcular matrices
                             nodo_inicio_obj = next(n for n in st.session_state.nodos if n['id'] == elem['nodo_inicio'])
@@ -3243,7 +3469,10 @@ elif st.session_state.step == 8:
                             elem['longitud'] = calcular_longitud_elemento(nodo_inicio_obj, nodo_fin_obj)
                             elem['beta'] = calcular_angulo_beta(nodo_inicio_obj, nodo_fin_obj)
                             
-                            E = props_material['modulo_young']
+                            # --- USO DEL NUEVO VALOR ---
+                            E = modulo_young_grupo
+                            # ---------------------------
+                            
                             A, I, L, beta = elem['area'], elem['inercia'], elem['longitud'], elem['beta']
                             
                             k_global, k_local, m_global, m_local = None, None, None, None
@@ -3252,8 +3481,7 @@ elif st.session_state.step == 8:
                                 k_global, k_local = generar_matriz_rigidez_barra(E, A, L, beta)
                                 if st.session_state.tipo_analisis == "dinamico":
                                     m_local = generar_matriz_masa_barra(elem['densidad'], A, L)
-                                    # (Falta T para masa de barra)
-                                    m_global = m_local # Placeholder
+                                    m_global = m_local 
                             elif st.session_state.tipo_elemento == "viga":
                                 k_global, k_local = generar_matriz_rigidez_viga(E, I, L)
                                 if st.session_state.tipo_analisis == "dinamico":
@@ -3273,15 +3501,13 @@ elif st.session_state.step == 8:
                                 'masa_local': m_local.tolist() if m_local is not None else []
                             }
                         
-                        st.success(f"✅ Configuración aplicada a {len(elementos_grupo_ids)} elementos del grupo '{nombre_grupo}'")
+                        st.success(f"✅ Configuración aplicada a {len(elementos_grupo_ids)} elementos. E = {modulo_young_grupo:.2e} Pa")
                         st.rerun()
                     st.divider()
 
     st.markdown("### Configuración Individual (Anula la configuración de grupo)")
     
     elementos_configurados = True
-    # Asegurarse de que st.session_state.elementos tenga el número correcto de elementos
-    # (El modo manual va a 7, luego 8. El interactivo va de 4 a 8)
     if len(st.session_state.elementos) < st.session_state.num_elementos:
         # Pre-poblar elementos si vienen del modo manual
         for i in range(st.session_state.num_elementos):
@@ -3569,9 +3795,57 @@ elif st.session_state.step == 9:
         if st.button("Continuar →", type="primary"):
             next_step()
 
-# --- PASO 10 (UNIFICADO) ---
-# --- PASO 10 (UNIFICADO) ---
 elif st.session_state.step == 10:
+    st.markdown("## Configuración de la Carga Dinámica")
+    
+    gl_restringidos_info = []
+    if 'condiciones_contorno_dinamica' in st.session_state:
+        for gl_num, restringido in st.session_state.condiciones_contorno_dinamica.items():
+            if restringido:
+                info = next((info for info in st.session_state.grados_libertad_info if info['numero'] == gl_num), None)
+                if info:
+                    gl_restringidos_info.append(info)
+    
+    if not gl_restringidos_info:
+        st.error("No se definieron GDL restringidos en el Paso 9. Vuelva atrás.")
+        st.stop()
+        
+    st.info("Defina la excitación armónica que se aplica a los GDL de la base (restringidos).")
+
+    tipo_carga = st.selectbox("Tipo de Carga", ["Armónica (Movimiento de Base)"], key="tipo_carga_din")
+    
+    if tipo_carga == "Armónica (Movimiento de Base)":
+        st.markdown("#### Parámetros de la Carga (Shaker)")
+        st.markdown(r"Se asume una aceleración de base: $\ddot{U}_y(t) = A \cdot \sin(\omega t)$")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            amplitud_A = st.number_input("Amplitud A [m/s²]", value=1.96, format="%.4f")
+        with col2:
+            freq_omega = st.number_input("Frecuencia $\omega$ [rad/s]", value=188.49, format="%.4f")
+
+        opciones_gdl = {f"GL{info['numero']} (Nodo {info['nodo']} - {info['direccion']})": info['numero'] for info in gl_restringidos_info}
+        
+        gdl_aplicados_labels = st.multiselect(
+            "Seleccione GDL de la base donde se aplica esta aceleración:",
+            options=opciones_gdl.keys()
+        )
+        
+        gdl_aplicados_nums = [opciones_gdl[label] for label in gdl_aplicados_labels]
+
+        if st.button("Guardar Carga y Continuar a Resultados →", type="primary"):
+            st.session_state.carga_dinamica_info = {
+                "tipo": "armonica_base",
+                "amplitud_A": amplitud_A,
+                "freq_omega": freq_omega,
+                "gdl_aplicados_nums": gdl_aplicados_nums
+            }
+            if 'resultados_forzados' in st.session_state:
+                st.session_state.resultados_forzados = None
+            next_step()
+
+# --- PASO 11  ---
+elif st.session_state.step == 11:
     
     # --- RAMA: ANÁLISIS ESTÁTICO ---
     if st.session_state.tipo_analisis == "estatico":
@@ -3587,7 +3861,7 @@ elif st.session_state.step == 10:
                     if resultado_estatico and resultado_estatico.get('exito'):
                         st.session_state.resultados = resultado_estatico
                         st.success("Análisis estático completado exitosamente.")
-                        st.rerun() # Recargar para mostrar resultados
+                        st.rerun()
                     else:
                         st.error("Error al resolver el sistema estático. Verifique las condiciones de contorno.")
             
@@ -3602,7 +3876,7 @@ elif st.session_state.step == 10:
             with col1: st.metric("Nodos", len(st.session_state.nodos))
             with col2: st.metric("Elementos", len(st.session_state.elementos))
             with col3: st.metric("DOF Libres", len(st.session_state.grados_libertad_info))
-            with col4: st.metric("Determinante K (Global)", f"{resultado_estatico['determinante']:.3e}")
+            with col4: st.metric("Determinante K", f"{resultado_estatico['determinante']:.3e}")
             
             st.divider()
             
@@ -3637,14 +3911,13 @@ elif st.session_state.step == 10:
                 st.markdown("#### Estructura Deformada")
                 fig_deformada = visualizar_estructura_moderna(mostrar_deformada=True, factor_escala=factor_escala_on_screen)
                 if fig_deformada:
-                    # --- CORRECCIÓN: Quitar use_container_width ---
-                    st.pyplot(fig_deformada)
+                    st.pyplot(fig_deformada, use_container_width=False)
             with col2:
                 st.markdown("#### Estructura Original")
                 fig_original = visualizar_estructura_moderna(mostrar_deformada=False)
                 if fig_original:
-                    # --- CORRECCIÓN: Quitar use_container_width ---
-                    st.pyplot(fig_original)
+                    st.pyplot(fig_original, use_container_width=False)
+            
             st.divider()
             
             st.markdown("### Exportar Análisis Estático")
@@ -3676,57 +3949,44 @@ elif st.session_state.step == 10:
                 st.markdown("#### Matriz de Rigidez Global (K)")
                 K_global = resultado_estatico['K_global']
                 df_K_global = pd.DataFrame(K_global, 
-                                           columns=[f"GL{i+1}" for i in range(K_global.shape[1])],
-                                           index=[f"GL{i+1}" for i in range(K_global.shape[0])])
+                                            columns=[f"GL{i+1}" for i in range(K_global.shape[1])],
+                                            index=[f"GL{i+1}" for i in range(K_global.shape[0])])
                 st.dataframe(df_K_global.applymap(lambda x: f"{x:.3e}"), use_container_width=True)
 
     # --- RAMA: ANÁLISIS DINÁMICO ---
     elif st.session_state.tipo_analisis == "dinamico":
         st.markdown("## Resultados del Análisis Dinámico")
-        st.markdown("Frecuencias naturales y modos de vibración")
         
-        # Mostrar botón de cálculo si no hay resultados
+        # 1. BOTÓN DE CÁLCULO PRINCIPAL
         if not st.session_state.resultados_dinamicos:
             if st.button("🧮 Calcular Sistema Dinámico", type="primary", use_container_width=True):
                 if not st.session_state.elementos or not st.session_state.grados_libertad_info:
-                    st.error("Por favor, asegúrese de haber definido todos los nodos y elementos.")
-                elif len([gl for gl in st.session_state.grados_libertad_info if not st.session_state.condiciones_contorno_dinamica.get(gl['numero'], False)]) < 1:
-                    st.error("Debe tener al menos 1 grado de libertad libre para realizar el análisis dinámico.")
+                    st.error("Faltan definir elementos.")
                 else:
                     resultado = resolver_sistema_dinamico()
                     if resultado and resultado.get('exito'):
                         st.session_state.resultados_dinamicos = resultado
-                        st.success("Sistema dinámico resuelto exitosamente.")
-                        st.rerun() # Recargar para mostrar resultados
-                    else:
-                        st.error("Error al resolver el sistema dinámico. Verifique las matrices o las condiciones de contorno.")
-            
-            st.warning("Por favor, presione 'Calcular Sistema Dinámico' para ver los resultados.")
+                        st.rerun()
+            st.stop()
 
-        # Mostrar resultados si existen
+        # 2. MOSTRAR RESULTADOS
         if st.session_state.resultados_dinamicos and st.session_state.resultados_dinamicos.get('exito'):
             resultado_din = st.session_state.resultados_dinamicos
             
-            # Métricas principales
-            st.markdown("### Métricas Principales")
+            # --- MÉTRICAS ---
             col1, col2, col3, col4 = st.columns(4)
-            with col1: st.metric("Nodos", len(st.session_state.nodos))
-            with col2: st.metric("Elementos", len(st.session_state.elementos))
-            with col3: st.metric("DOF Libres", len(resultado_din['dof_libres']))
-            with col4: st.metric("Modos Calculados", len(resultado_din['frecuencias_hz']))
-            
+            col1.metric("Modo 1", f"{resultado_din['frecuencias_hz'][0]:.2f} Hz")
+            col2.metric("Modo 2", f"{resultado_din['frecuencias_hz'][1]:.2f} Hz")
+            col3.metric("Modo 3", f"{resultado_din['frecuencias_hz'][2]:.2f} Hz")
+            col4.metric("Total Modos", len(resultado_din['frecuencias_hz']))
             st.divider()
-            
-            # Tabla de todos los modos (Formato Excel)
-            st.markdown("### Frecuencias y Formas Modales")
-            st.info("Tabla de resultados estilo Excel, como la solicitada.")
-            
-            df_modos_completa = crear_tabla_modos_completa()
-            st.dataframe(df_modos_completa, use_container_width=True, hide_index=True)
-            
-            st.divider()
-            
-            # Selector de modo para visualización
+
+            # --- TABLA DE MODOS ---
+            with st.expander("Ver Tabla de Frecuencias y Modos", expanded=True):
+                df_modos = crear_tabla_modos_completa()
+                st.dataframe(df_modos, use_container_width=True)
+
+            # --- VISUALIZACIÓN DE MODOS ---
             st.markdown("### Visualización de Modos")
             num_modos = len(resultado_din['frecuencias_hz'])
 
@@ -3738,59 +3998,165 @@ elif st.session_state.step == 10:
                     format_func=lambda x: f"Modo {x} - f = {resultado_din['frecuencias_hz'][x-1]:.2f} Hz"
                 )
                 
-                st.session_state.modo_visualizacion = modo_seleccionado
-                
                 idx_modo = modo_seleccionado - 1 
-                omega_modo = resultado_din['frecuencias_rad'][idx_modo]
                 f_modo = resultado_din['frecuencias_hz'][idx_modo]
                 
-                col_m1, col_m2, col_m3 = st.columns(3)
-                with col_m1: st.metric("Número de Modo", modo_seleccionado)
-                with col_m2: st.metric("Frecuencia (f)", f"{f_modo:.4f} Hz")
-                with col_m3: st.metric("Frec. Angular (ω)", f"{omega_modo:.4f} rad/s")
-
-                # Calcular el factor de escala automático
+                # Cálculo de factor escala automático para visualización
                 factor_escala = None 
                 try:
                     max_despl = np.max(np.abs(resultado_din['eigenvectors'][:, idx_modo]))
                     if max_despl > 1e-9:
-                        rango_x_orig = max(n['x'] for n in st.session_state.nodos) - min(n['x'] for n in st.session_state.nodos)
-                        rango_y_orig = max(n['y'] for n in st.session_state.nodos) - min(n['y'] for n in st.session_state.nodos)
-                        rango_global_orig = max(rango_x_orig, rango_y_orig, 1.0)
-                        factor_escala = (0.1 * rango_global_orig) / max_despl
-                        factor_escala = max(1, min(factor_escala, 500))
+                        rango_x = max([n['x'] for n in st.session_state.nodos]) if st.session_state.nodos else 1.0
+                        factor_escala = (0.15 * rango_x) / max_despl
+                        factor_escala = max(1, min(factor_escala, 1000))
                     else:
                         factor_escala = 1.0
                 except:
-                    factor_escala = 1.0 
-                
+                    factor_escala = 1.0
                 
                 col_viz1, col_viz2 = st.columns(2) 
                 
                 with col_viz1:
                     st.markdown("#### Estructura Original")
-                    fig_original_base = visualizar_estructura_moderna(mostrar_deformada=False, factor_escala=1.0)
-                    if fig_original_base:
-                        # --- CORRECCIÓN: Quitar use_container_width ---
-                        st.pyplot(fig_original_base)
-                    else:
-                        st.warning("No se pudo generar el gráfico de la estructura original.")
+                    fig_orig = visualizar_estructura_moderna(mostrar_deformada=False)
+                    if fig_orig: st.pyplot(fig_orig, use_container_width=False)
 
                 with col_viz2:
-                    st.markdown(f"#### Modo {modo_seleccionado} (f = {f_modo:.2f} Hz)")
+                    st.markdown(f"#### Modo {modo_seleccionado} (Deformada)")
                     fig_modo = visualizar_modo_dinamico(idx_modo, factor_escala=factor_escala) 
-                    if fig_modo:
-                        # --- CORRECCIÓN: Quitar use_container_width ---
-                        st.pyplot(fig_modo) 
-                    else:
-                        st.warning("No se pudo generar el gráfico del modo de vibración.")
-                
+                    if fig_modo: st.pyplot(fig_modo, use_container_width=False)
             else:
-                st.warning("⚠️ No se encontraron modos de vibración (frecuencias > 0).")
-                st.info("Esto usualmente significa que la estructura no está correctamente restringida (es un mecanismo) y solo tiene modos de cuerpo rígido con frecuencia cero.")
+                st.warning("No hay modos válidos para visualizar.")
+            
+            st.divider()
+            
+            # --- SECCIÓN A: RESPUESTA TEMPORAL ---
+            st.markdown("### 1. Respuesta Temporal (Transitorio + Estacionario)")
+            st.info("Gráfico de la respuesta en el tiempo ante la carga armónica definida.")
+            
+            if st.session_state.carga_dinamica_info:
+                if st.session_state.resultados_forzados is None:
+                    st.session_state.resultados_forzados = calcular_respuesta_armonica_base(
+                        resultado_din, st.session_state.carga_dinamica_info
+                    )
+                
+                res_forzado = st.session_state.resultados_forzados
+                
+                col_sel1, col_sel2 = st.columns([1, 3])
+                with col_sel1:
+                    gdl_plot_time = st.selectbox("GDL para Tiempo:", res_forzado['dof_libres_nums'], format_func=lambda x: f"GL {x}")
+                    t_max_plot = st.number_input("T. Max [s]", value=0.2, step=0.05)
+                
+                with col_sel2:
+                    # Cálculo del gráfico temporal
+                    omega_exc = st.session_state.carga_dinamica_info['freq_omega']
+                    idx_plot = res_forzado['dof_libres_nums'].index(gdl_plot_time)
+                    Phi = resultado_din['eigenvectors']
+                    P_0 = res_forzado['P_0_vector']
+                    freqs_n = resultado_din['frecuencias_rad']
+                    M_libre = resultado_din['M_libre']
+                    
+                    t = np.linspace(0, t_max_plot, 1000)
+                    u_t = np.zeros_like(t)
+                    
+                    for i in range(Phi.shape[1]):
+                        phi = Phi[:, i]
+                        wn = freqs_n[i]
+                        m_gen = phi.T @ M_libre @ phi
+                        k_gen = m_gen * (wn**2)
+                        f_gen = phi.T @ P_0
+                        
+                        if k_gen > 1e-9:
+                            qst = f_gen/k_gen
+                            if abs(omega_exc - wn) < 1e-2:
+                                qt = 0.5 * qst * (np.sin(wn*t) - wn*t*np.cos(wn*t))
+                            else:
+                                beta = omega_exc/wn
+                                daf = 1/(1-beta**2)
+                                qt = qst * daf * (np.sin(omega_exc*t) - beta*np.sin(wn*t))
+                            u_t += phi[idx_plot] * qt
+                            
+                    # Gráfico Fijo
+                    fig_time, ax_time = plt.subplots(figsize=(10, 6)) 
+                    ax_time.plot(t, u_t, label=f"Respuesta GL {gdl_plot_time}", linewidth=1.5)
+                    ax_time.set_title(f"Respuesta Temporal - GL {gdl_plot_time}")
+                    ax_time.set_xlabel("Tiempo [s]")
+                    ax_time.set_ylabel("Desplazamiento [m]")
+                    ax_time.grid(True, which='both', linestyle='--', alpha=0.7)
+                    ax_time.legend()
+                    ax_time.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
+                    
+                    st.session_state['fig_time_last'] = fig_time
+                    st.pyplot(fig_time, use_container_width=False)
+
+            st.divider()
+
+            # --- SECCIÓN B: RESPUESTA EN FRECUENCIA (BARRIDO) ---
+            st.markdown("### 2. Respuesta en Frecuencia (Barrido)")
+            st.info("Gráficos de Aceleración (g) y Desplazamiento vs Frecuencia de Excitación.")
+            
+            col_b1, col_b2, col_b3 = st.columns(3)
+            with col_b1:
+                f_start = st.number_input("Frec. Inicio [Hz]", 0.0, value=0.0)
+            with col_b2:
+                f_end = st.number_input("Frec. Fin [Hz]", value=200.0, min_value=1.0)
+            with col_b3:
+                steps_b = st.number_input("Puntos", 50, 2000, 200)
+            
+            if st.button("Generar Gráficos de Frecuencia"):
+                with st.spinner("Calculando barrido..."):
+                    gdl_base = st.session_state.carga_dinamica_info.get('gdl_aplicados_nums', [])
+                    res_barrido = calcular_barrido_frecuencia(
+                        resultado_din, 
+                        st.session_state.carga_dinamica_info, 
+                        f_start, f_end, steps_b, gdl_base
+                    )
+                    st.session_state['res_barrido'] = res_barrido
+            
+            if 'res_barrido' in st.session_state:
+                res_b = st.session_state['res_barrido']
+                
+                gdl_plot_freq = st.selectbox("Seleccionar GDL para curvas:", res_b['dof_libres'], key="sel_gdl_freq", format_func=lambda x: f"GL {x}")
+                idx_gf = res_b['dof_libres'].index(gdl_plot_freq)
+                
+                # --- 1. Gráfico Aceleración vs Frecuencia (en g) ---
+                fig_acc, ax_acc = plt.subplots(figsize=(10, 6)) # FIJO
+                
+                # Conversión de Unidades
+                g_const = 9.81
+                acc_response_g = res_b['aceleraciones'][:, idx_gf] / g_const
+                acc_input_m_s2 = st.session_state.carga_dinamica_info['amplitud_A']
+                acc_input_g = acc_input_m_s2 / g_const
+                
+                # Plot Respuesta
+                ax_acc.plot(res_b['freqs'], acc_response_g, color='red', linewidth=1.5, label=f"Respuesta (Nodo Extremo GL {gdl_plot_freq})")
+                
+                # Plot Excitación (Línea Punteada Azul)
+                ax_acc.plot(res_b['freqs'], [acc_input_g]*len(res_b['freqs']), color='blue', linestyle='--', linewidth=1.5, label="Excitación (Base)")
+                
+                ax_acc.set_title(f"Respuesta en Frecuencia (Aceleración) - GL {gdl_plot_freq}")
+                ax_acc.set_xlabel("Frecuencia [Hz]")
+                ax_acc.set_ylabel("Aceleración [g]")
+                ax_acc.legend()
+                ax_acc.grid(True, which="both", ls="-", alpha=0.6)
+                
+                st.session_state['fig_acc_last'] = fig_acc
+                st.pyplot(fig_acc, use_container_width=False)
+
+                # --- 2. Gráfico Desplazamiento vs Frecuencia ---
+                fig_disp, ax_disp = plt.subplots(figsize=(10, 6)) # FIJO
+                ax_disp.plot(res_b['freqs'], res_b['desplazamientos'][:, idx_gf], color='blue', linewidth=1.5)
+                ax_disp.set_title(f"Respuesta en Frecuencia (Desplazamiento) - GL {gdl_plot_freq}")
+                ax_disp.set_xlabel("Frecuencia [Hz]")
+                ax_disp.set_ylabel("Desplazamiento [m]")
+                ax_disp.grid(True, which="both", ls="-", alpha=0.6)
+                
+                st.session_state['fig_disp_last'] = fig_disp
+                st.pyplot(fig_disp, use_container_width=False)
 
             st.divider()
             
+            # --- EXPORTACIÓN ---
             st.markdown("### Exportar Análisis Dinámico")
             col_exp1, col_exp2 = st.columns(2)
             
@@ -3808,13 +4174,6 @@ elif st.session_state.step == 10:
 
             st.divider()
             
-            st.markdown("#### Tabla de Nodos")
-            df_nodos = crear_tabla_nodos()
-            st.dataframe(df_nodos, use_container_width=True, hide_index=True)
-            st.markdown("#### Tabla de Conectividad")
-            df_conectividad = crear_tabla_conectividad()
-            st.dataframe(df_conectividad, use_container_width=True, hide_index=True)
-
             with st.expander("Ver Matrices Globales del Sistema (K y M)"):
                 st.markdown(f"**Matrices Globales (Tamaño: {len(st.session_state.grados_libertad_info)} x {len(st.session_state.grados_libertad_info)})**")
                 K_global_full = resultado_din['K_global']
@@ -3867,16 +4226,6 @@ elif st.session_state.step == 10:
                             df_m_local = pd.DataFrame(matriz_m_local, index=labels, columns=labels)
                             st.dataframe(df_m_local.applymap(lambda x: f"{x:.3e}"))
 
-# El paso 11 ya no se usa
-elif st.session_state.step == 11:
-    st.markdown("## Resultados del Análisis")
-    st.info("Los resultados se muestran en el paso anterior (Paso 10).")
-    st.warning("Por favor, retroceda al paso anterior para ver los resultados.")
-    if st.button("← Volver a Resultados"):
-        st.session_state.step = 10
-        st.rerun()
-
-# --- Footer (de V4.7) ---
 st.markdown("""
 <div style='background-color: #212529; padding: 2rem; margin-top: 3rem; border-radius: 15px;'>
     <div style='text-align: center; color: white;'>
